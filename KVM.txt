@@ -1,0 +1,90 @@
+KVM虚拟化技术
+    
+    环境部署：
+        KVM虚拟机网络模式：
+            Bridge（网桥）：
+                网桥的基本原理就是创建一个桥接接口br0，在物理网卡和虚拟网络接口之间传递数据，如下图：
+        
+            NAT：虚拟接口和物理接口之间没有连接关系，所以虚拟机只能在通过虚拟的网络访问外部世界，无法从网络上定位和访问虚拟机 
+        
+                “透传”：嵌套式虚拟nested是一个可通过内核参数来启用的功能。它能够使一台虚拟机具有物理机CPU特性,支持vmx或者svm(AMD)硬件虚拟化。
+        实验步骤
+            KVM安装前准备
+                安装Centos7.3图形化界面系统，配置本地yum 源
+                检查主机处理器是否支持虚拟化：egrep -o 'vmx | svm' /proc/cpuinfo | wc -l
+                如果返回显示数值是 0，则表示该 CPU 不支持虚拟化
+
+            为了方便实验，关闭firewall和selinux：
+                systemctl stop firewalld.service
+                systemctl disable firewalld.service
+
+                setenforce 0			#临时关闭selinux
+                或vim /etc/sysconfi/selinux，将第7行参数“enforcing”改为“disabled”，然后重启服务器，永久关闭selinux
+
+            安装KVM	
+                yum install qemu-kvm* virt-* libvirt* -y
+            
+                启动服务并加入开机自启
+                    systemctl start libvirtd
+                    systemctl enable libvirtd
+            
+                检查kvm模块挂载情况：lsmod |grep kvm_intel
+        
+
+            开启主机“透传”功能，需要重启服务器
+            echo "options kvm_intel nested=1" >> /etc/modprobe.d/kvm-nested.conf
+            
+            查询透传是否开启（Y或N）
+                cat /sys/module/kvm_intel/parameters/nested
+
+
+        创建网桥br0
+            
+            查看主机网上相关信息：ip a		
+            
+
+            上图可以看到，有4块网块，分别为：
+                enp2s0f0	enp2s0f1	enp2s0f2	enp2s0f3
+                virbr0：kvm安装完后自带的网桥，主要供NAT网络使用
+                virbr0-nic：virbr0网桥上的一个子接口，相当与nat网络里的网关接口
+
+            使用enp2s0f0做为网桥
+                service NetworkManager stop		#关闭图形化自带的NM网络管理工具
+                chkconfig NetworkManager off	#关闭开机自启
+            
+                cd /etc/sysconfig/network-scripts/	#进入网卡配置文件目录
+                cp ifcfg-enp2s0f0 ifcfg-enp2s0f0.bak	#备份网卡1配置文件
+                cp ifcfg-enp2s0f0 ifcfg-br0		#创建br0网桥配置文件
+                vim ifcfg-enp2s0f0				#修改网卡1配置文件
+            
+                TYPE=Ethernet					#设备类型
+                    BOOTPROTO=none					#不指定ip获取类型（dhcp/static）
+                    DEVICE=enp2s0f0					#设备名称
+                    ONBBOT=yes						#开机启动
+                    BRIDGE=br0						#指定网桥为br0
+                    wq保存退出
+
+                vim ifcfg-br0					#修改网桥bro配置文件
+
+                    TYPE=Bridge						#设定设备类型为网桥
+                    BOOTPROTO=static				#指定IP方式为静态IP地址
+                    NAME=br0						#名称
+                    DEVICE=br0						#设备名称
+                    ONBOOT=yes						#开机启动
+                    IPADDR=192.168.80.40			#IP地址
+                    NETMASK=255.255.255.0			#子网掩码 
+                    GATEWAY=192.168.80.1			#网关
+                    DNS1=114.114.114.114			#第一个DNS服务器
+                    DNS2=8.8.8.8					#第二个DNS服务器
+
+            重启网络：systemctl restart network
+            重启libvirt服务：systemctl restart libvirtd
+
+            查看网桥：brctl show
+            
+
+        开启网桥stp树协议，防止环路：brctl stp br0 yes
+
+    创建虚拟机：        
+    
+
