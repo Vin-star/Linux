@@ -85,6 +85,63 @@ KVM虚拟化技术
 
         开启网桥stp树协议，防止环路：brctl stp br0 yes
 
-    创建虚拟机：        
+    创建虚拟机：
+        创建前准备
+	        把系统镜像（iso）放到某个目录下,这里的系统镜像路径为:/opt/centos7.iso
+
+        开始创建虚拟机：    
+            创建一个存放虚拟机系统的卷：qemu-img create -f qcow2 /var/lib/libvirt/images/base.qcow2 50G
+            参数说明：
+                 -f							指定卷的格式为qcow2
+                /var/lib/libvirt/images		虚拟机卷存放的默认路径
+                base.qcow2					完整卷名
+                50G							卷的大小
+                2）	创建虚拟机：
+                virt-install \				#创建命令
+                -n base \					#虚拟机显示名（非虚拟机主机名）
+                -r 4096 \					#虚拟机内存大小
+                --vcpus 2 \					#虚拟机cpu个数
+                --disk /var/lib/libvirt/images/base.qcow2 \			#系统磁盘卷路径
+                --location /var/lib/libvirt/images/centos7.iso \		#系统安装iso路径
+                --nographics \										#不调用图形化界面
+                --network bridge=br0 \								#网卡1指定网桥
+                --network bridge=br0 \								#网卡2指定网桥
+                --os-type linux \									#操作系统类型
+                --os-variant rhel7 \									#操作系统版本
+                --console pty,target_type=serial \					#console控制通道
+                --extra-args 'console=ttyS0,115200n8 serial'			#文本输出
+ 
+            开始进入centos系统安装……
+ 
+
+        时区设置：选择“Asia”亚洲-“shanghai”
+ 
+        软件包选择：选择“Infrastructure Server”（基础设施服务器），然后按c继续
+
+        完成设置后可以开始安装系统了，按“b”开始安装
+    
+        到此安装结束，按回车重启系统
+        回到宿主机查看网桥情况，可以看到在“interfaces”下多了2个网卡，vnet0，vnet1。
+        
+        建好的虚拟机网卡，已桥接在物理网卡上了：brctl show
+ 
+    配置虚拟机：
+        设置主机名：
+            hostnamectl set-hostname base.xftest.com
+        
+        配置IP地址
+            可以使用NetworkManager网络管理工具快速设置：nmtui
+   
+            退出再次激活网卡即可
+ 
+ 
+            按下回车，重置*号
+
+        查看ip：ifconfig
+ 
+
+        测试与主机的通信，测试与外界的通信
+            ping 192.168.80.40
+            ping www.baidu.com
     
 
